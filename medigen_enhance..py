@@ -11,7 +11,7 @@ load_dotenv()
 google_api_key = os.getenv("GOOGLE_API_KEY")
 
 # Configure AI Model
-genai.configure(api_key="AIzaSyBvmtExlnLz-qfmb5EFBbuP_ZwKtL7Wqjo")
+genai.configure(api_key=your_google_api_key)
 
 generation_config = {
     "temperature": 1,

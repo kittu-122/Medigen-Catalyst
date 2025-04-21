@@ -1,35 +1,13 @@
 import streamlit as st
 import os
-import subprocess
-import sys
-import importlib
+from PIL import Image
+from dotenv import load_dotenv
+import hashlib
+import google.generativeai as genai
+from weasyprint import HTML
 
-# Display installation status
+# Configure page
 st.set_page_config(page_title="MediGen Catalyst", page_icon="🩺")
-st.title("Setting up dependencies...")
-
-# Install required packages
-try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai"])
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow", "python-dotenv", "weasyprint"])
-
-    st.success("Dependencies installed successfully!")
-except Exception as e:
-    st.error(f"Error installing dependencies: {str(e)}")
-    st.info("Attempting to continue with existing packages...")
-
-# Now import the packages
-try:
-    from PIL import Image
-    from dotenv import load_dotenv
-    import hashlib
-    import google.generativeai as genai
-    from weasyprint import HTML
-    st.success("All required packages imported successfully!")
-except ImportError as e:
-    st.error(f"Failed to import: {str(e)}")
-    st.stop()
 
 # Load environment variables
 load_dotenv()
@@ -85,15 +63,6 @@ Your Responsibilities include:
 Please provide me an output response with these 4 headings Detailed Analysis,Findings Report,Recommendation and Next Steps,Treatment Suggestions, medications and ointments, home-made remedies 
 """
 
-# Remove the setup-related UI now that dependencies are installed
-if st.session_state.get("show_main_app") is None:
-    st.session_state.show_main_app = True
-    st.rerun()
-
-# Sidebar Navigation
-st.sidebar.title("🔍 Navigation")
-page = st.sidebar.radio("Go to:", ["🏠 Home", "📂 Upload & Analyze", "💬 Ask AI", "🕘 Previous Interactions", "ℹ️ How It Works"])
-
 # Initialize session states
 if "analyses" not in st.session_state:
     st.session_state.analyses = {}
@@ -119,6 +88,10 @@ def hash_image(image):
     except Exception as e:
         st.error(f"Error hashing image: {str(e)}")
         return None
+
+# Sidebar Navigation
+st.sidebar.title("🔍 Navigation")
+page = st.sidebar.radio("Go to:", ["🏠 Home", "📂 Upload & Analyze", "💬 Ask AI", "🕘 Previous Interactions", "ℹ️ How It Works"])
 
 # ------------------- HOME PAGE -------------------
 if page == "🏠 Home":

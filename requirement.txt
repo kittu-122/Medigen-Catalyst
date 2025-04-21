@@ -1,4 +1,8 @@
-streamlit==0.86.0
-Pillow==8.3.2
-google==3.0.0
 langchain-google-genai
+streamlit
+Pillow
+google-cloud-aiplatform
+google-generativeai
+python-dotenv
+pdfkit
+weasyprint

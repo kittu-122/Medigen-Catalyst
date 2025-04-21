@@ -1,14 +1,48 @@
 import streamlit as st
-from PIL import Image
 import os
-import google.generativeai as genai
-from dotenv import load_dotenv
-from weasyprint import HTML
-import hashlib
+import subprocess
+import sys
+import importlib
+
+# Display installation status
+st.set_page_config(page_title="MediGen Catalyst", page_icon="🩺")
+st.title("Setting up dependencies...")
+
+# Install required packages
+try:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "google-generativeai"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow", "python-dotenv", "weasyprint"])
+
+    st.success("Dependencies installed successfully!")
+except Exception as e:
+    st.error(f"Error installing dependencies: {str(e)}")
+    st.info("Attempting to continue with existing packages...")
+
+# Now import the packages
+try:
+    from PIL import Image
+    from dotenv import load_dotenv
+    import hashlib
+    import google.generativeai as genai
+    from weasyprint import HTML
+    st.success("All required packages imported successfully!")
+except ImportError as e:
+    st.error(f"Failed to import: {str(e)}")
+    st.stop()
 
 # Load environment variables
 load_dotenv()
 google_api_key = os.getenv("GOOGLE_API_KEY")
+
+# Check if API key exists
+if not google_api_key:
+    google_api_key = st.text_input("Enter your Google API Key:", type="password")
+    if not google_api_key:
+        st.warning("No API key found. Please enter your Google API key to continue.")
+        st.stop()
+
+# Configure AI Model
 genai.configure(api_key=google_api_key)
 
 generation_config = {
@@ -51,8 +85,10 @@ Your Responsibilities include:
 Please provide me an output response with these 4 headings Detailed Analysis,Findings Report,Recommendation and Next Steps,Treatment Suggestions, medications and ointments, home-made remedies 
 """
 
-# Configure Streamlit page
-st.set_page_config(page_title="MediGen Catalyst", page_icon="🩺")
+# Remove the setup-related UI now that dependencies are installed
+if st.session_state.get("show_main_app") is None:
+    st.session_state.show_main_app = True
+    st.rerun()
 
 # Sidebar Navigation
 st.sidebar.title("🔍 Navigation")
@@ -68,19 +104,33 @@ if "selected_image" not in st.session_state:
 
 # Function to generate and download PDF reports
 def generate_pdf(report_text, filename="analysis_report.pdf"):
-    HTML(string=report_text).write_pdf(filename)
-    return filename
+    try:
+        HTML(string=report_text).write_pdf(filename)
+        return filename
+    except Exception as e:
+        st.error(f"Error generating PDF: {str(e)}")
+        return None
 
 # Function to hash images (for deduplication)
 def hash_image(image):
-    image_bytes = image.tobytes()
-    return hashlib.md5(image_bytes).hexdigest()
+    try:
+        image_bytes = image.tobytes()
+        return hashlib.md5(image_bytes).hexdigest()
+    except Exception as e:
+        st.error(f"Error hashing image: {str(e)}")
+        return None
 
 # ------------------- HOME PAGE -------------------
 if page == "🏠 Home":
     st.title("🏥 Welcome to MediGen Catalyst")
     st.write("An AI-powered platform for **medical image analysis**. Upload an image, get insights, and ask follow-up questions.")
-    st.image("medigencat.png", width=200)
+    
+    # Check if image exists, if not show placeholder text
+    try:
+        st.image("medigencat.png", width=200)
+    except:
+        st.warning("Logo image not found. Please add 'medigencat.png' to your app directory.")
+    
     st.info("🔹 Use the sidebar to upload images or ask AI questions.")
 
 # ------------------- UPLOAD & ANALYZE -------------------
@@ -95,13 +145,16 @@ elif page == "📂 Upload & Analyze":
         unique_images = []
 
         for uploaded_file in uploaded_files:
-            image = Image.open(uploaded_file)
-            st.image(image, width=150, caption=f"Uploaded: {uploaded_file.name}")
+            try:
+                image = Image.open(uploaded_file)
+                st.image(image, width=150, caption=f"Uploaded: {uploaded_file.name}")
 
-            image_hash = hash_image(image)
-            if image_hash not in processed_images:
-                processed_images[image_hash] = uploaded_file
-                unique_images.append(image_hash)
+                image_hash = hash_image(image)
+                if image_hash and image_hash not in processed_images:
+                    processed_images[image_hash] = uploaded_file
+                    unique_images.append(image_hash)
+            except Exception as e:
+                st.error(f"Error processing image {uploaded_file.name}: {str(e)}")
 
         for image_hash in unique_images:
             primary_file = processed_images[image_hash]
@@ -110,39 +163,45 @@ elif page == "📂 Upload & Analyze":
                 st.session_state.selected_image = primary_file  # Store the image for follow-up questions
                 progress_bar = st.progress(0)
 
-                image_data = primary_file.getvalue()
-                image_parts = [{"mime_type": "image/jpeg", "data": image_data}]
-                prompt_parts = [image_parts[0], system_prompts]
+                try:
+                    image_data = primary_file.getvalue()
+                    image_parts = [{"mime_type": "image/jpeg", "data": image_data}]
+                    prompt_parts = [image_parts[0], system_prompts]
 
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-pro-latest",
-                    generation_config=generation_config,
-                    safety_settings=safety_settings,
-                )
+                    model = genai.GenerativeModel(
+                        model_name="gemini-1.5-pro-latest",
+                        generation_config=generation_config,
+                        safety_settings=safety_settings,
+                    )
 
-                with st.spinner("🔎 Analyzing..."):
-                    response = model.generate_content(prompt_parts)
+                    with st.spinner("🔎 Analyzing..."):
+                        response = model.generate_content(prompt_parts)
+                        progress_bar.progress(50)
 
-                if response and response.text:
-                    analysis_text = response.text
-                    st.write(f"### 📝 Analysis for {primary_file.name}")
-                    st.write(analysis_text)
-                    st.session_state.analyses[primary_file.name] = analysis_text
+                    if response and response.text:
+                        analysis_text = response.text
+                        st.write(f"### 📝 Analysis for {primary_file.name}")
+                        st.write(analysis_text)
+                        st.session_state.analyses[primary_file.name] = analysis_text
+                        progress_bar.progress(100)
+
+                        # Generate and provide download link for report
+                        pdf_filename = generate_pdf(analysis_text)
+                        if pdf_filename:
+                            with open(pdf_filename, "rb") as pdf_file:
+                                st.download_button(label="📥 Download Report", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
+                    else:
+                        st.error("❌ Failed to generate analysis. Please try again.")
+                except Exception as e:
+                    st.error(f"Error during analysis: {str(e)}")
                     progress_bar.progress(100)
-
-                    # Generate and provide download link for report
-                    pdf_filename = generate_pdf(analysis_text)
-                    with open(pdf_filename, "rb") as pdf_file:
-                        st.download_button(label="📥 Download Report", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
-                else:
-                    st.error("❌ Failed to generate analysis. Please try again.")
 
     # 🔹 Show previous analyses below images
     if st.session_state.analyses:
         st.subheader("🔍 Previous Analyses")
         for image_name, analysis_text in st.session_state.analyses.items():
-            st.write(f"### 📝 Analysis for {image_name}")
-            st.write(analysis_text)
+            with st.expander(f"Analysis for {image_name}"):
+                st.write(analysis_text)
 
     # 🔹 Button to clear analysis history
     if st.button("🗑️ Clear Analysis History"):
@@ -156,40 +215,46 @@ elif page == "💬 Ask AI":
     if not st.session_state.selected_image:
         st.warning("Please analyze an image first in 'Upload & Analyze' before asking AI.")
     else:
-        selected_image = st.session_state.selected_image
-        analysis_text = st.session_state.analyses.get(selected_image.name, "No analysis available.")
+        try:
+            selected_image = st.session_state.selected_image
+            analysis_text = st.session_state.analyses.get(selected_image.name, "No analysis available.")
 
-        # Show the analyzed image and its report
-        st.image(selected_image, width=200, caption=f"Current Image: {selected_image.name}")
-        st.write(f"### 📝 Analysis for {selected_image.name}")
-        st.write(analysis_text)
+            # Show the analyzed image and its report
+            st.image(selected_image, width=200, caption=f"Current Image: {selected_image.name}")
+            st.write(f"### 📝 Analysis for {selected_image.name}")
+            st.write(analysis_text)
 
-        # Display chat history
-        chat_container = st.container()
-        for q, r in st.session_state.chat_history:
-            with chat_container:
-                st.markdown(f"**🧑‍⚕️ User:** {q}")
-                st.markdown(f"**🤖 AI:** {r}")
+            # Display chat history
+            chat_container = st.container()
+            for q, r in st.session_state.chat_history:
+                with chat_container:
+                    st.markdown(f"**🧑‍⚕️ User:** {q}")
+                    st.markdown(f"**🤖 AI:** {r}")
 
-        # Input for AI follow-up questions
-        question = st.text_input("💡 Ask a follow-up question:", key="chat_input")
+            # Input for AI follow-up questions
+            question = st.text_input("💡 Ask a follow-up question:", key="chat_input")
 
-        if st.button("Ask AI") and question:
-            chatbot_prompt = f"Based on the previous analysis: {analysis_text}, answer this question: {question}"
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro-latest",
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-            )
+            if st.button("Ask AI") and question:
+                try:
+                    chatbot_prompt = f"Based on the previous analysis: {analysis_text}, answer this question: {question}"
+                    model = genai.GenerativeModel(
+                        model_name="gemini-1.5-pro-latest",
+                        generation_config=generation_config,
+                        safety_settings=safety_settings,
+                    )
 
-            with st.spinner("🤖 Thinking..."):
-                chatbot_response = model.generate_content(chatbot_prompt)
+                    with st.spinner("🤖 Thinking..."):
+                        chatbot_response = model.generate_content(chatbot_prompt)
 
-            if chatbot_response and chatbot_response.text:
-                st.session_state.chat_history.append((question, chatbot_response.text))
-
-                # Refresh UI
-                st.rerun()
+                    if chatbot_response and chatbot_response.text:
+                        st.session_state.chat_history.append((question, chatbot_response.text))
+                        st.rerun()
+                    else:
+                        st.error("Failed to get a response from AI. Please try again.")
+                except Exception as e:
+                    st.error(f"Error during AI conversation: {str(e)}")
+        except Exception as e:
+            st.error(f"Error displaying analysis: {str(e)}")
 
 # ------------------- PREVIOUS INTERACTIONS -------------------
 elif page == "🕘 Previous Interactions":
@@ -215,4 +280,9 @@ elif page == "ℹ️ How It Works":
     - AI recommends **medications & ointments**  
     - Ask follow-up questions  
     """)
-    st.image("workflow_diagram.png", caption="Working of Medigen-Catalyst")
+    
+    # Check if image exists, if not show placeholder text
+    try:
+        st.image("workflow_diagram.png", caption="Working of Medigen-Catalyst")
+    except:
+        st.warning("Workflow diagram not found. Please add 'workflow_diagram.png' to your app directory.")

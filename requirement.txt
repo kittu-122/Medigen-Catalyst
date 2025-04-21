@@ -1,8 +1,8 @@
-langchain-google-genai
 streamlit
 Pillow
-google-cloud-aiplatform
-google-generativeai
 python-dotenv
-pdfkit
+google-generativeai
 weasyprint
+langchain-google-genai
+google-cloud-aiplatform
+pdfkit

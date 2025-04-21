@@ -64,12 +64,12 @@ Here the instructions to run medigen-catalyst in GUI mode:
 
 2. Create a Python Virtual environment in your current folder so that you don't corrupt the global python environment creating conflicts with other python applications:
   ```
-  python -m venv medi
+  python -m venv medical
   ```
 
 3. Activate the Python virtual environment:
   ```
-  medi/bin/activate
+  .\medical\Scripts\activate
   ```
 
 4. Install the Python libraries in your Python virtual environment:
@@ -79,7 +79,7 @@ Here the instructions to run medigen-catalyst in GUI mode:
 
 5. Run the Medigen-Catalyst streamlit app:
   ```
-  streamlit run medigen_catalyst.py
+  streamlit run filename.py
   ```
 
 ## Usage:
